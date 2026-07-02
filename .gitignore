@@ -1,0 +1,5 @@
+.env
+docker_persist/
+node_modules/
+*.log
+.DS_Store

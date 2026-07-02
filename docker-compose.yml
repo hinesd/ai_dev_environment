@@ -1,0 +1,53 @@
+services:
+
+  openclaw-gateway:
+    build:
+      context: ./openclaw/
+      dockerfile: Dockerfile
+    container_name: openclaw-gateway
+    ports:
+      - "18789:18789"
+    environment:
+      - OPENCLAW_GATEWAY_BIND=lan
+      - OPENCLAW_DISABLE_BONJOUR=1
+    env_file:
+      - .env
+    volumes:
+      - ./docker_persist/config:/home/node/.openclaw
+      - ./docker_persist/workspace:/home/node/.openclaw/workspace
+      - ./docker_persist/auth-secrets:/home/node/.config/openclaw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18789/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  openclaw-cli:
+    build:
+      context: ./openclaw/
+      dockerfile: Dockerfile
+    container_name: openclaw-cli
+    profiles:
+      - cli
+    network_mode: "service:openclaw-gateway"
+    entrypoint: ["node", "dist/index.js"]
+    env_file:
+      - .env
+    volumes:
+      - ./docker_persist/config:/home/node/.openclaw
+      - ./docker_persist/workspace:/home/node/.openclaw/workspace
+      - ./docker_persist/auth-secrets:/home/node/.config/openclaw
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
