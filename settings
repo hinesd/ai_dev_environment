@@ -1,6 +1,6 @@
 # ─── Network ──────────────────────────────
-OPENCLAW_LAN_IP ?= 10.20.30.5
-OPENCLAW_DOCKER_SUBNET ?= 172.30.0.0/16
+OPENCLAW_LAN_IP=10.20.30.5
+OPENCLAW_DOCKER_SUBNET=172.30.0.0/16
 
 # ─── Backend ─────────────────────────────
-OPENCLAW_LMSTUDIO_PORT ?= 1234
+OPENCLAW_LMSTUDIO_PORT=1234

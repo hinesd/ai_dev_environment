@@ -1,12 +1,8 @@
 .PHONY: configure
 configure:
-	$(DOCKER_COMPOSE) run --rm --no-deps --entrypoint node openclaw-gateway \
-		dist/index.js config unset gateway.auth.token || true
-	$(DOCKER_COMPOSE) run --rm --no-deps --entrypoint node openclaw-gateway \
-		dist/index.js config unset gateway.auth.password || true
-	$(DOCKER_COMPOSE) run --rm --no-deps --entrypoint node openclaw-gateway \
+	@$(DOCKER_COMPOSE) run --rm --no-deps --entrypoint node openclaw-gateway \
 		dist/index.js config set --batch-json "$$(cat services/openclaw/gateway-config.json)"
-	$(DOCKER_COMPOSE) restart openclaw-gateway
+	@$(DOCKER_COMPOSE) restart openclaw-gateway
 
 .PHONY: qr
 qr:

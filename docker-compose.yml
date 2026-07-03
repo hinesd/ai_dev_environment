@@ -16,6 +16,7 @@ services:
       - OPENCLAW_GATEWAY_BIND=lan
       - OPENCLAW_DISABLE_BONJOUR=1
     env_file:
+      - settings
       - .env
     volumes:
       - ./state:/home/node/.openclaw
