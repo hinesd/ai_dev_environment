@@ -21,8 +21,7 @@ Dockerized [OpenClaw](https://github.com/openclaw) gateway behind a **Caddy** re
 | Component | Host | Notes |
 |-----------|------|-------|
 | **Caddy** | Docker (`openclaw-caddy`) | TLS termination, reverse proxy, injects `X-Forwarded-User` for trusted-proxy auth |
-| **openclaw-gateway** | Docker (`openclaw-gateway`) | `ghcr.io/openclaw/openclaw:latest`, no host port exposure |
-| **openclaw-cli** | Docker (profiled) | CLI tooling, on-demand, shares gateway network namespace |
+| **openclaw-gateway** | Docker (`openclaw-gateway`) | `ghcr.io/openclaw/openclaw:latest`, no host port exposure. All CLI commands run via `docker compose exec` inside this container. |
 | **LM Studio** | Host | LLM backend, reached via `host.docker.internal:1234` |
 
 Caddy binds to the host's LAN IP on ports 80/443 (not `0.0.0.0`). The gateway is only reachable through Caddy on the internal bridge network. This means:
@@ -265,7 +264,7 @@ The Makefile includes targets from three files under `.make/` plus composed targ
 | `make security-audit` | Run OpenClaw security audit |
 | `make cli CMD="..."` | Run an arbitrary CLI command |
 | `make channels CMD="..."` | Manage messaging channels |
-| `make dashboard` | Launch the Control UI (CLI container) |
+| `make dashboard` | Launch the dashboard inside the gateway container |
 
 ### Top-level `Makefile`
 
