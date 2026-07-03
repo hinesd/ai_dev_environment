@@ -1,5 +1,6 @@
 DOCKER_COMPOSE := docker compose
 
+include settings
 include .env
 export
 

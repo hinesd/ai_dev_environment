@@ -3,13 +3,13 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.30.0.0/16
+        - subnet: ${OPENCLAW_DOCKER_SUBNET}
 
 services:
 
   openclaw-gateway:
     build:
-      context: ./openclaw/
+      context: ./services/openclaw/
       dockerfile: Dockerfile
     container_name: openclaw-gateway
     environment:
@@ -18,9 +18,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./docker_persist/config:/home/node/.openclaw
-      - ./docker_persist/workspace:/home/node/.openclaw/workspace
-      - ./docker_persist/auth-secrets:/home/node/.config/openclaw
+      - ./state:/home/node/.openclaw
+      - ./workspace:/home/node/.openclaw/workspace
     networks:
       - openclaw-net
     extra_hosts:
@@ -45,7 +44,7 @@ services:
       - "${OPENCLAW_LAN_IP}:80:80"
       - "${OPENCLAW_LAN_IP}:443:443"
     volumes:
-      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./services/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     networks:
       - openclaw-net

@@ -1,5 +1,8 @@
 .env
-docker_persist/
+state/
+workspace/
 node_modules/
 *.log
 .DS_Store
+*~
+*.sw[nop]
