@@ -1,0 +1,12 @@
+openclaw.home {
+    tls internal {
+        on_demand
+    }
+
+    reverse_proxy openclaw-gateway:18789 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-User openclaw-operator
+    }
+}

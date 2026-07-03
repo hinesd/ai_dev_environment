@@ -1,0 +1,21 @@
+[
+  {"path":"gateway.mode","value":"local"},
+  {"path":"gateway.bind","value":"lan"},
+  {"path":"gateway.controlUi.allowedOrigins","value":["http://localhost:18789","http://127.0.0.1:18789","https://openclaw.home"]},
+  {"path":"gateway.controlUi.allowInsecureAuth","value":false},
+  {"path":"gateway.auth.mode","value":"trusted-proxy"},
+  {"path":"gateway.auth.trustedProxy.userHeader","value":"X-Forwarded-User"},
+  {"path":"gateway.auth.trustedProxy.allowUsers","value":["openclaw-operator"]},
+  {"path":"gateway.auth.password","value":"${OPENCLAW_GATEWAY_PASSWORD}"},
+  {"path":"gateway.trustedProxies","value":["172.30.0.0/16"]},
+  {"path":"gateway.auth.rateLimit","value":{"maxAttempts":50,"windowMs":60000,"lockoutMs":5000}},
+  {"path":"gateway.nodes.pairing.autoApproveCidrs","value":["172.30.0.0/16"]},
+  {"path":"session.dmScope","value":"per-channel-peer"},
+  {"path":"agents.defaults.model.primary","value":"lmstudio/openai/gpt-oss-20b"},
+  {"path":"agents.defaults.workspace","value":"/home/node/.openclaw/workspace"},
+  {"path":"models.providers.lmstudio","value":{"baseUrl":"http://host.docker.internal:1234/v1","api":"openai-completions","auth":"api-key","apiKey":"LM_API_TOKEN","models":[{"id":"qwen/qwen3.5-9b","name":"Qwen3.5 9B","reasoning":true,"input":["text","image"],"contextWindow":262144,"maxTokens":8192}]}},
+  {"path":"tools.byProvider","value":{"lmstudio/qwen/qwen3.5-9b":{"deny":["group:web","browser"]},"lmstudio/openai/gpt-oss-20b":{"deny":["group:web","browser"]}}},
+  {"path":"tools.web.search.enabled","value":false},
+  {"path":"tools.web.fetch.enabled","value":false},
+  {"path":"browser.enabled","value":false}
+]

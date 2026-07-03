@@ -1,3 +1,10 @@
+networks:
+  openclaw-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
 services:
 
   openclaw-gateway:
@@ -5,8 +12,6 @@ services:
       context: ./openclaw/
       dockerfile: Dockerfile
     container_name: openclaw-gateway
-    ports:
-      - "18789:18789"
     environment:
       - OPENCLAW_GATEWAY_BIND=lan
       - OPENCLAW_DISABLE_BONJOUR=1
@@ -16,6 +21,8 @@ services:
       - ./docker_persist/config:/home/node/.openclaw
       - ./docker_persist/workspace:/home/node/.openclaw/workspace
       - ./docker_persist/auth-secrets:/home/node/.config/openclaw
+    networks:
+      - openclaw-net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     cap_drop:
@@ -31,23 +38,25 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  openclaw-cli:
-    build:
-      context: ./openclaw/
-      dockerfile: Dockerfile
-    container_name: openclaw-cli
-    profiles:
-      - cli
-    network_mode: "service:openclaw-gateway"
-    entrypoint: ["node", "dist/index.js"]
-    env_file:
-      - .env
+  caddy:
+    image: caddy:2-alpine
+    container_name: openclaw-caddy
+    ports:
+      - "${OPENCLAW_LAN_IP}:80:80"
+      - "${OPENCLAW_LAN_IP}:443:443"
     volumes:
-      - ./docker_persist/config:/home/node/.openclaw
-      - ./docker_persist/workspace:/home/node/.openclaw/workspace
-      - ./docker_persist/auth-secrets:/home/node/.config/openclaw
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    networks:
+      - openclaw-net
     cap_drop:
       - NET_RAW
-      - NET_ADMIN
     security_opt:
       - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      openclaw-gateway:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
