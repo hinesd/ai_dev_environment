@@ -1,7 +1,7 @@
 [
   {"path":"gateway.mode","value":"local"},
   {"path":"gateway.bind","value":"lan"},
-  {"path":"gateway.controlUi.allowedOrigins","value":["http://localhost:18789","http://127.0.0.1:18789","https://openclaw.home"]},
+  {"path":"gateway.controlUi.allowedOrigins","value":["http://localhost:18789","http://127.0.0.1:18789","https://${DUCKDNS_DOMAIN}"]},
   {"path":"gateway.controlUi.allowInsecureAuth","value":false},
   {"path":"gateway.auth.mode","value":"trusted-proxy"},
   {"path":"gateway.auth.trustedProxy.userHeader","value":"X-Forwarded-User"},

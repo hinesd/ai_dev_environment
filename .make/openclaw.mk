@@ -7,7 +7,7 @@ configure:
 .PHONY: qr
 qr:
 	docker compose exec -T openclaw-gateway \
-		node dist/index.js qr --password "$(OPENCLAW_GATEWAY_PASSWORD)" --url wss://openclaw.home
+		node dist/index.js qr --password "$(OPENCLAW_GATEWAY_PASSWORD)" --url wss://$(DUCKDNS_DOMAIN)
 
 .PHONY: devices-list
 devices-list:
@@ -28,6 +28,12 @@ nodes-approve:
 nodes-status:
 	docker compose exec -T openclaw-gateway \
 		node dist/index.js nodes status
+
+.PHONY: devices-pending
+devices-pending:
+	@docker compose exec -T openclaw-gateway \
+		node dist/index.js devices list --json | \
+		python3 -c 'import json,sys; data=json.load(sys.stdin); [print("make devices-approve REQ="+p["requestId"]) for p in data.get("pending",[])]'
 
 .PHONY: nodes-pending
 nodes-pending:

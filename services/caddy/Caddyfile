@@ -1,6 +1,9 @@
-openclaw.home {
-    tls internal {
-        on_demand
+{$DUCKDNS_DOMAIN} {
+    tls {
+        dns duckdns {
+            api_token {env.DUCKDNS_TOKEN}
+            override_domain {$DUCKDNS_DOMAIN}
+        }
     }
 
     reverse_proxy openclaw-gateway:18789 {

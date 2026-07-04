@@ -4,3 +4,6 @@ OPENCLAW_DOCKER_SUBNET=172.30.0.0/16
 
 # ─── Backend ─────────────────────────────
 OPENCLAW_LMSTUDIO_PORT=1234
+
+# ─── DuckDNS ──────────────────────────────
+DUCKDNS_DOMAIN=my-local-server.duckdns.org
