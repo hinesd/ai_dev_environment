@@ -1,6 +1,7 @@
 .env
 state/
 workspace/
+models-cache/
 node_modules/
 *.log
 .DS_Store

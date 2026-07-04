@@ -7,18 +7,47 @@ networks:
 
 services:
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: openclaw-ollama
+    profiles: ["local-llm"]
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - openclaw-net
+    restart: unless-stopped
+
   openclaw-gateway:
     build:
       context: ./services/openclaw/
       dockerfile: Dockerfile
     container_name: openclaw-gateway
     environment:
-      - OPENCLAW_GATEWAY_BIND=lan
+      - OPENCLAW_GATEWAY_BIND=loopback
       - OPENCLAW_DISABLE_BONJOUR=1
+      - OPENCLAW_DEFAULT_MODEL=${OPENCLAW_DEFAULT_MODEL}
+      - OPENCLAW_PATCH=${OPENCLAW_PATCH}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-sk-not-configured}
     env_file:
       - settings
       - .env
+    command: >
+      sh -c '
+        if [ ! -f /home/node/.openclaw/openclaw.json ]; then
+          echo "First run: applying config patch ($$OPENCLAW_PATCH)..."
+          openclaw config patch --file /etc/openclaw/$$OPENCLAW_PATCH --dry-run
+          openclaw config patch --file /etc/openclaw/$$OPENCLAW_PATCH
+          echo "Config initialized successfully."
+        fi
+        exec node openclaw.mjs gateway
+      '
+    ports:
+      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT}:${OPENCLAW_GATEWAY_PORT}"
+      - "${OPENCLAW_LAN_IP}:80:80"
+      - "${OPENCLAW_LAN_IP}:443:443"
     volumes:
+      - ./services/openclaw/openclaw.patch.local.json5:/etc/openclaw/openclaw.patch.local.json5:ro
+      - ./services/openclaw/openclaw.patch.cloud.json5:/etc/openclaw/openclaw.patch.cloud.json5:ro
       - ./state:/home/node/.openclaw
       - ./workspace:/home/node/.openclaw/workspace
     networks:
@@ -31,7 +60,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18789/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${OPENCLAW_GATEWAY_PORT}/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -46,18 +75,10 @@ services:
     env_file:
       - settings
       - .env
-    ports:
-      - "${OPENCLAW_LAN_IP}:80:80"
-      - "${OPENCLAW_LAN_IP}:443:443"
+    network_mode: "service:openclaw-gateway"
     volumes:
       - ./services/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    dns:
-      - 127.0.0.11
-      - 1.1.1.1
-      - 8.8.8.8
-    networks:
-      - openclaw-net
     cap_drop:
       - NET_RAW
     security_opt:
@@ -69,3 +90,4 @@ services:
 
 volumes:
   caddy_data:
+  ollama_data:

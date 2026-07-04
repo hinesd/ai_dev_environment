@@ -1,47 +1,82 @@
+.PHONY: configure-seed
+configure-seed:
+	@echo "Seeding gateway config (DEBUG=$(DEBUG))..."
+	@cat services/openclaw/$(OPENCLAW_PATCH) | $(OPENCLAW_RUN) config patch --stdin $(CONFIGURE_REPLACE_PATHS) --dry-run \
+		&& cat services/openclaw/$(OPENCLAW_PATCH) | $(OPENCLAW_RUN) config patch --stdin $(CONFIGURE_REPLACE_PATHS) \
+		&& $(OPENCLAW_RUN) config validate
+
 .PHONY: configure
 configure:
-	@$(DOCKER_COMPOSE) run --rm --no-deps --entrypoint node openclaw-gateway \
-		dist/index.js config set --batch-json "$$(cat services/openclaw/gateway-config.json)"
-	@$(DOCKER_COMPOSE) restart openclaw-gateway
+	@echo "Validating gateway config (DEBUG=$(DEBUG))..."
+	@$(OPENCLAW) config patch --file /etc/openclaw/$(OPENCLAW_PATCH) $(CONFIGURE_REPLACE_PATHS) --dry-run \
+		&& echo "Applying gateway config..." \
+		&& $(OPENCLAW) config patch --file /etc/openclaw/$(OPENCLAW_PATCH) $(CONFIGURE_REPLACE_PATHS) \
+		&& echo "Validating..." \
+		&& $(OPENCLAW) config validate \
+		&& echo "Restarting services..." \
+		&& $(DOCKER_COMPOSE) restart openclaw-gateway \
+		&& sleep 2 \
+		&& $(DOCKER_COMPOSE) restart openclaw-caddy
+
+.PHONY: llm
+llm:
+	@if [ "$(DEBUG)" != "true" ]; then echo "DEBUG=$(DEBUG) — set DEBUG=true to use local LLM"; exit 1; fi
+	$(DOCKER_COMPOSE) --profile local-llm up -d ollama
+	$(DOCKER_COMPOSE) exec -T ollama ollama pull qwen2.5:7b
+
+.PHONY: llm-model-pull
+llm-model-pull:
+ifeq ($(DEBUG),true)
+	@echo "Starting Ollama and pulling model..."
+	$(DOCKER_COMPOSE) --profile local-llm up -d ollama
+	@echo "Waiting for Ollama to be ready..."
+	@until $(DOCKER_COMPOSE) exec -T ollama ollama list > /dev/null 2>&1; do \
+		echo "  waiting..."; sleep 2; \
+	done
+	@echo "Pulling model..."
+	$(DOCKER_COMPOSE) exec -T ollama ollama pull qwen2.5:7b
+else
+	@echo "DEBUG=false — skipping local model pull"
+endif
 
 .PHONY: qr
 qr:
-	docker compose exec -T openclaw-gateway \
-		node dist/index.js qr --password "$(OPENCLAW_GATEWAY_PASSWORD)" --url wss://$(DUCKDNS_DOMAIN)
+	$(OPENCLAW) qr --password "$(OPENCLAW_GATEWAY_PASSWORD)" --url wss://$(DUCKDNS_DOMAIN)
 
 .PHONY: devices-list
 devices-list:
-	docker compose exec -T openclaw-gateway \
-		node dist/index.js devices list --password "$(OPENCLAW_GATEWAY_PASSWORD)"
+	$(OPENCLAW) devices list --password "$(OPENCLAW_GATEWAY_PASSWORD)"
 
 .PHONY: devices-approve
 devices-approve:
-	docker compose exec -T openclaw-gateway \
-		node dist/index.js devices approve $(REQ) --password "$(OPENCLAW_GATEWAY_PASSWORD)"
+	$(OPENCLAW) devices approve $(REQ) --password "$(OPENCLAW_GATEWAY_PASSWORD)"
 
 .PHONY: nodes-approve
 nodes-approve:
-	docker compose exec -T openclaw-gateway \
-		node dist/index.js nodes approve $(REQ)
+	$(OPENCLAW) nodes approve $(REQ)
 
 .PHONY: nodes-status
 nodes-status:
-	docker compose exec -T openclaw-gateway \
-		node dist/index.js nodes status
+	$(OPENCLAW) nodes status
 
 .PHONY: devices-pending
 devices-pending:
-	@docker compose exec -T openclaw-gateway \
-		node dist/index.js devices list --json | \
+	@$(OPENCLAW) devices list --json | \
 		python3 -c 'import json,sys; data=json.load(sys.stdin); [print("make devices-approve REQ="+p["requestId"]) for p in data.get("pending",[])]'
 
 .PHONY: nodes-pending
 nodes-pending:
-	@docker compose exec -T openclaw-gateway \
-		node dist/index.js nodes pending --json | \
+	@$(OPENCLAW) nodes pending --json | \
 		python3 -c 'import json,sys; [print("make nodes-approve REQ="+p["requestId"]) for p in json.load(sys.stdin)]'
 
 .PHONY: security-audit
 security-audit:
-	docker compose exec -T openclaw-gateway \
-		node dist/index.js security audit $(ARGS)
+	$(OPENCLAW) security audit $(ARGS)
+
+.PHONY: doctor-lint
+doctor-lint:
+	$(OPENCLAW) doctor --lint
+
+.PHONY: doctor-fix
+doctor-fix:
+	$(OPENCLAW) doctor --fix

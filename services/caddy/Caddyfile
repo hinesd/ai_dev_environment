@@ -6,10 +6,15 @@
         }
     }
 
-    reverse_proxy openclaw-gateway:18789 {
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-User openclaw-operator
+    @trusted remote_ip {env.OPENCLAW_LAN_SUBNET} {env.OPENCLAW_DOCKER_SUBNET}
+
+    handle @trusted {
+        reverse_proxy 127.0.0.1:{env.OPENCLAW_GATEWAY_PORT} {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Real-IP {remote_host}
+        }
     }
+
+    respond "Forbidden" 403
 }
