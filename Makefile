@@ -1,4 +1,4 @@
--include environment/.env
+-include .env
 MODEL_DEFAULT ?= ollama/qwen2.5:7b
 
 ifneq (,$(findstring ollama,$(MODEL_DEFAULT)))

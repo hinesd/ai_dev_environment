@@ -30,8 +30,7 @@ services:
       - "${STATIC_IP}:80:80"
       - "${STATIC_IP}:443:443"
     env_file:
-      - environment/.env.network
-      - environment/.env.secrets
+      - .env
     volumes:
       - ./src/openclaw:/etc/openclaw:ro
       - ./state:/home/node/.openclaw
@@ -58,8 +57,7 @@ services:
     container_name: openclaw-caddy
     network_mode: "service:openclaw-gateway"
     env_file:
-      - environment/.env.network
-      - environment/.env.secrets
+      - .env
     volumes:
       - ./src/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
