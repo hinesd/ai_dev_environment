@@ -3,14 +3,14 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: ${OPENCLAW_DOCKER_SUBNET}
+        - subnet: ${DOCKER_SUBNET}
 
 services:
 
   ollama:
     image: ollama/ollama:latest
     container_name: openclaw-ollama
-    profiles: ["local-llm"]
+    profiles: ["ollama"]
     volumes:
       - ollama_data:/root/.ollama
     networks:
@@ -19,48 +19,32 @@ services:
 
   openclaw-gateway:
     build:
-      context: ./services/openclaw/
+      context: ./src/openclaw/
       dockerfile: Dockerfile
     container_name: openclaw-gateway
     environment:
-      - OPENCLAW_GATEWAY_BIND=loopback
-      - OPENCLAW_DISABLE_BONJOUR=1
-      - OPENCLAW_DEFAULT_MODEL=${OPENCLAW_DEFAULT_MODEL}
-      - OPENCLAW_PATCH=${OPENCLAW_PATCH}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-sk-not-configured}
-    env_file:
-      - settings
-      - .env
-    command: >
-      sh -c '
-        if [ ! -f /home/node/.openclaw/openclaw.json ]; then
-          echo "First run: applying config patch ($$OPENCLAW_PATCH)..."
-          openclaw config patch --file /etc/openclaw/$$OPENCLAW_PATCH --dry-run
-          openclaw config patch --file /etc/openclaw/$$OPENCLAW_PATCH
-          echo "Config initialized successfully."
-        fi
-        exec node openclaw.mjs gateway
-      '
+      - MODEL_DEFAULT=${MODEL_DEFAULT}
+    command: node openclaw.mjs gateway
     ports:
-      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT}:${OPENCLAW_GATEWAY_PORT}"
-      - "${OPENCLAW_LAN_IP}:80:80"
-      - "${OPENCLAW_LAN_IP}:443:443"
+      - "127.0.0.1:${GATEWAY_PORT}:${GATEWAY_PORT}"
+      - "${STATIC_IP}:80:80"
+      - "${STATIC_IP}:443:443"
+    env_file:
+      - environment/.env.network
+      - environment/.env.secrets
     volumes:
-      - ./services/openclaw/openclaw.patch.local.json5:/etc/openclaw/openclaw.patch.local.json5:ro
-      - ./services/openclaw/openclaw.patch.cloud.json5:/etc/openclaw/openclaw.patch.cloud.json5:ro
+      - ./src/openclaw:/etc/openclaw:ro
       - ./state:/home/node/.openclaw
       - ./workspace:/home/node/.openclaw/workspace
     networks:
       - openclaw-net
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     cap_drop:
       - NET_RAW
       - NET_ADMIN
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${OPENCLAW_GATEWAY_PORT}/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${GATEWAY_PORT}/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -69,15 +53,15 @@ services:
 
   caddy:
     build:
-      context: ./services/caddy/
+      context: ./src/caddy/
       dockerfile: Dockerfile
     container_name: openclaw-caddy
-    env_file:
-      - settings
-      - .env
     network_mode: "service:openclaw-gateway"
+    env_file:
+      - environment/.env.network
+      - environment/.env.secrets
     volumes:
-      - ./services/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./src/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     cap_drop:
       - NET_RAW

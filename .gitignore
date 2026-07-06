@@ -1,4 +1,5 @@
-.env
+environment/.env
+environment/.env.secrets
 state/
 workspace/
 models-cache/

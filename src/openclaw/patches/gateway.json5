@@ -1,0 +1,25 @@
+{
+  gateway: {
+    mode: "local",
+    bind: "loopback",
+    auth: {
+      mode: "password",
+      password: { source: "env", provider: "default", id: "OPENCLAW_GATEWAY_PASSWORD" },
+      rateLimit: { maxAttempts: 50, windowMs: 60000, lockoutMs: 5000 },
+    },
+    controlUi: {
+      allowedOrigins: [
+        "http://localhost:${GATEWAY_PORT}",
+        "http://127.0.0.1:${GATEWAY_PORT}",
+        "https://${DUCKDNS_DOMAIN}",
+      ],
+    },
+    trustedProxies: ["${DOCKER_SUBNET}"],
+    nodes: {
+      pairing: { autoApproveCidrs: ["${DOCKER_SUBNET}"] },
+    },
+  },
+  discovery: {
+    mdns: { mode: "off" },
+  },
+}

@@ -21,7 +21,7 @@ logs:
 .PHONY: wait-healthy
 wait-healthy:
 	@echo "Waiting for gateway to be healthy..."
-	@until $(DOCKER_COMPOSE) exec -T openclaw-gateway curl -fsS http://127.0.0.1:$(OPENCLAW_GATEWAY_PORT)/healthz > /dev/null 2>&1; do \
+	@until $(DOCKER_COMPOSE) exec -T openclaw-gateway curl -fsS http://127.0.0.1:$(GATEWAY_PORT)/healthz > /dev/null 2>&1; do \
 		echo "  waiting..."; sleep 2; \
 	done
 	@echo "Gateway is healthy."

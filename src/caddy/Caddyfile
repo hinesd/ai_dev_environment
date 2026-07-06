@@ -6,10 +6,12 @@
         }
     }
 
-    @trusted remote_ip {env.OPENCLAW_LAN_SUBNET} {env.OPENCLAW_DOCKER_SUBNET}
+    @trusted remote_ip \
+        {env.TRUSTED_SUBNET} \
+        {env.DOCKER_SUBNET}
 
     handle @trusted {
-        reverse_proxy 127.0.0.1:{env.OPENCLAW_GATEWAY_PORT} {
+        reverse_proxy 127.0.0.1:{env.GATEWAY_PORT} {
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
             header_up X-Real-IP {remote_host}

@@ -1,9 +1,9 @@
-# reconfigure — Apply openclaw.patch.json5 changes without rebuilding.
-#   Use when you only edit services/openclaw/openclaw.patch.json5.
+# config — Apply idempotent patches to the running gateway.
+#   Use when you edit src/openclaw/patches/*.json5.
 .PHONY: reconfigure
-reconfigure: configure wait-healthy
+reconfigure: config wait-healthy
 	@echo ""
-	@echo "Reconfigure complete — gateway is healthy."
+	@echo "Config applied — gateway is healthy."
 
 # restart — Stop and restart services. Data is preserved.
 .PHONY: restart
