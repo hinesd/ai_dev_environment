@@ -1,0 +1,20 @@
+{
+  models: {
+    providers: {
+      "local-model": {
+        baseUrl: "http://host.docker.internal:${LOCAL_MODEL_PORT}/engines/v1",
+        apiKey: "local",
+        api: "openai-completions",
+        timeoutSeconds: 300,
+        models: [
+          {
+            id: "${LOCAL_MODEL_ID}",
+            name: "Local LLM (Gemma 3 1B)",
+            reasoning: true,
+            input: ["text"],
+          },
+        ],
+      },
+    },
+  },
+}
