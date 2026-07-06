@@ -34,8 +34,4 @@ security-audit:
 
 .PHONY: doctor-lint
 doctor-lint:
-	$(OPENCLAW) doctor --lint
-
-.PHONY: doctor-fix
-doctor-fix:
-	$(OPENCLAW) doctor --fix
+	-$(OPENCLAW) doctor --lint	

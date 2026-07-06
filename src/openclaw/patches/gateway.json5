@@ -14,7 +14,7 @@
         "https://${DUCKDNS_DOMAIN}",
       ],
     },
-    trustedProxies: ["${DOCKER_SUBNET}"],
+    trustedProxies: ["127.0.0.1", "${DOCKER_SUBNET}"],
     nodes: {
       pairing: { autoApproveCidrs: ["${DOCKER_SUBNET}"] },
     },

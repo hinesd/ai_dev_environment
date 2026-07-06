@@ -25,3 +25,11 @@ wait-healthy:
 		echo "  waiting..."; sleep 2; \
 	done
 	@echo "Gateway is healthy."
+
+.PHONY: model-pull
+model-pull:
+	@if [ -n "$(LOCAL_MODEL)" ]; then \
+		docker model pull $(LOCAL_MODEL_ID); \
+	else \
+		echo "LOCAL_MODEL not set — skipping model pull"; \
+	fi

@@ -1,7 +1,6 @@
 {
   agents: {
     defaults: {
-      model: { primary: "${MODEL_DEFAULT}" },
     },
   },
 }

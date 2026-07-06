@@ -1,36 +1,42 @@
-networks:
-  openclaw-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: ${DOCKER_SUBNET}
-
 services:
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: openclaw-ollama
-    profiles: ["ollama"]
+  caddy:
+    build:
+      context: ./src/caddy
+      dockerfile: Dockerfile
+    container_name: openclaw-caddy
+    network_mode: "service:openclaw-gateway"
+    env_file: [.env]
     volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - openclaw-net
+      - ./src/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    cap_drop:
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
+    depends_on:
+      openclaw-gateway:
+        condition: service_healthy
 
   openclaw-gateway:
     build:
-      context: ./src/openclaw/
+      context: ./src/openclaw
       dockerfile: Dockerfile
     container_name: openclaw-gateway
-    environment:
-      - MODEL_DEFAULT=${MODEL_DEFAULT}
-    command: node openclaw.mjs gateway
+    command:
+      - sh
+      - -c
+      - |
+        echo "Applying patches..."
+        for f in /etc/openclaw/patches/*.json5; do
+          cat "$$f" | node dist/index.js config patch --stdin
+        done
+        exec node openclaw.mjs gateway
     ports:
       - "127.0.0.1:${GATEWAY_PORT}:${GATEWAY_PORT}"
       - "${STATIC_IP}:80:80"
       - "${STATIC_IP}:443:443"
-    env_file:
-      - .env
+    env_file: [.env]
     volumes:
       - ./src/openclaw:/etc/openclaw:ro
       - ./state:/home/node/.openclaw
@@ -50,26 +56,26 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  caddy:
-    build:
-      context: ./src/caddy/
-      dockerfile: Dockerfile
-    container_name: openclaw-caddy
-    network_mode: "service:openclaw-gateway"
-    env_file:
-      - .env
-    volumes:
-      - ./src/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-    cap_drop:
-      - NET_RAW
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
-    depends_on:
-      openclaw-gateway:
-        condition: service_healthy
+  local-model:
+    profiles: ["local-model"]
+    image: alpine:latest
+    command: tail -f /dev/null
+    networks:
+      - openclaw-net
+    models:
+      - llm
+
+models:
+  llm:
+    model: ${LOCAL_MODEL_ID}
+    context_size: 32768
+
+networks:
+  openclaw-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${DOCKER_SUBNET}
 
 volumes:
   caddy_data:
-  ollama_data:
