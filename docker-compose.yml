@@ -59,7 +59,6 @@ services:
   local-model:
     profiles: ["local-model"]
     image: alpine:latest
-    command: tail -f /dev/null
     networks:
       - openclaw-net
     models:

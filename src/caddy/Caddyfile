@@ -18,5 +18,7 @@
         }
     }
 
-    respond "Forbidden" 403
+    respond "Forbidden" 403 {
+        close
+    }
 }

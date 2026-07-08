@@ -179,6 +179,42 @@ Everything binds to `127.0.0.1` (loopback). The only external-facing ports are C
 
 Caddy and the gateway share a network namespace (`network_mode: service:openclaw-gateway`), so Caddy reaches the gateway at localhost with zero network hop.
 
+### Security model
+
+Access control is enforced in three independent layers:
+
+| Layer | Mechanism | What it enforces |
+|---|---|---|
+| 1 — Network | Your router/switch/firewall | Only devices on `TRUSTED_SUBNET` can route to `STATIC_IP` at all |
+| 2 — Kernel | Docker port binding to `${STATIC_IP}` | The listening socket only exists on that one interface; other interfaces on the host cannot reach it |
+| 3 — Application | Caddy `remote_ip` matcher | Source IP checked against `TRUSTED_SUBNET` + `DOCKER_SUBNET` on every request; anything else gets a 403 and the connection is dropped |
+
+All three layers must be compromised simultaneously for an untrusted client to reach the gateway. The Caddy layer works identically on every OS.
+
+### Choosing a `TRUSTED_SUBNET`
+
+**Recommended:** use a dedicated subnet that contains only devices you own and trust — for example a separate VLAN, a management network, or a VPN tunnel address pool. This means Layer 1 is enforced in hardware by your router before traffic ever reaches the host.
+
+**Acceptable but weaker:** your general LAN subnet (e.g. `192.168.1.0/24`). Layer 3 still blocks untrusted IPs, but any device on your LAN (including guest devices or IoT hardware, if they share the subnet) can at minimum reach the Caddy socket.
+
+Most managed switches and all-in-one routers support VLANs for this purpose. Configure your router to block inter-VLAN routing between the trusted network and any others, then point `STATIC_IP` and `TRUSTED_SUBNET` at that VLAN.
+
+### DuckDNS and local traffic
+
+DuckDNS resolves `DUCKDNS_DOMAIN` to `STATIC_IP` — a private LAN address. Connections from trusted devices therefore stay entirely within your local network; no traffic reaches the public internet. This also means TLS certificates are obtained via DNS-01 challenge (not HTTP-01), so port 80/443 never need to be exposed to the internet.
+
+### Additional hardening on Linux
+
+On Linux, Docker manages `iptables` automatically. You can add rules to the `DOCKER-USER` chain to enforce `TRUSTED_SUBNET` at the kernel level as a complement to Caddy's application-layer check. These rules survive Docker restarts:
+
+```sh
+# Replace with your actual TRUSTED_SUBNET and DOCKER_SUBNET values
+iptables -I DOCKER-USER -p tcp --dport 443 ! -s "${TRUSTED_SUBNET}" -j DROP
+iptables -I DOCKER-USER -p tcp --dport 80  ! -s "${TRUSTED_SUBNET}" -j DROP
+```
+
+Persist these rules using your distro's preferred method (`iptables-persistent`, `nftables`, `firewalld`, etc.).
+
 ### Docker Model Runner networking
 
 The model server runs on the host (required for Metal GPU on macOS). The gateway reaches it at `host.docker.internal:12434`. The compose `models:` element manages the server lifecycle alongside other services.
