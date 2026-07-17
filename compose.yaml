@@ -1,41 +1,11 @@
 services:
-  caddy:
-    build:
-      context: ./src/caddy
-      dockerfile: Dockerfile
-    container_name: openclaw-caddy
-    network_mode: "service:openclaw-gateway"
-    env_file: [.env]
-    volumes:
-      - ./src/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-    cap_drop:
-      - NET_RAW
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
-    depends_on:
-      openclaw-gateway:
-        condition: service_healthy
-
   openclaw-gateway:
     build:
       context: ./src/openclaw
       dockerfile: Dockerfile
     container_name: openclaw-gateway
-    command:
-      - sh
-      - -c
-      - |
-        echo "Applying patches..."
-        for f in /etc/openclaw/patches/*.json5; do
-          cat "$$f" | node dist/index.js config patch --stdin
-        done
-        exec node openclaw.mjs gateway
     ports:
       - "127.0.0.1:${GATEWAY_PORT}:${GATEWAY_PORT}"
-      - "${STATIC_IP}:80:80"
-      - "${STATIC_IP}:443:443"
     env_file: [.env]
     volumes:
       - ./src/openclaw:/etc/openclaw:ro
@@ -56,9 +26,14 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # Anchor service: exists only to bind the top-level models: element to the
+  # local-model profile so Compose manages the Docker Model Runner lifecycle.
+  # `sleep infinity` keeps it running so `up --wait` counts it as healthy.
   local-model:
     profiles: ["local-model"]
     image: alpine:latest
+    command: sleep infinity
+    restart: unless-stopped
     networks:
       - openclaw-net
     models:
@@ -75,6 +50,3 @@ networks:
     ipam:
       config:
         - subnet: ${DOCKER_SUBNET}
-
-volumes:
-  caddy_data:

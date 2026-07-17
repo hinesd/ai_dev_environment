@@ -1,20 +1,35 @@
 # AI Dev Environment
 
-Dockerized [OpenClaw](https://github.com/openclaw) gateway behind a **Caddy** reverse proxy, with local inference via **Docker Model Runner** (llama.cpp) and cloud inference via **DeepSeek**.
+Dockerized [OpenClaw](https://github.com/openclaw) gateway, with local inference via **Docker Model Runner** (llama.cpp) and cloud inference via **DeepSeek**. Runs in two modes: **local** (default, loopback only) or **lan** (Caddy reverse proxy with DuckDNS TLS and IP filter for trusted devices on your network).
 
 ## Quick start
 
 ```bash
 # 1. Copy and edit .env
 cp .env.example .env
-# → Fill in DUCKDNS_DOMAIN, DUCKDNS_TOKEN, DEEPSEEK_API_KEY
 # → Set OPENCLAW_GATEWAY_PASSWORD (replace REPLACE_ME)
+# → Optionally set DEEPSEEK_API_KEY for cloud inference
 
 # 2. Deploy
 make init
 ```
 
+That's it for local mode — the gateway is at `http://127.0.0.1:18789`, loopback only.
+
+## Modes
+
+| | `MODE=local` (default) | `MODE=lan` |
+|---|---|---|
+| Compose files | `compose.yaml` | `compose.yaml` + `compose.lan.yaml` |
+| Services | gateway (+ local-model) | gateway (+ local-model) + Caddy |
+| Reachable from | this machine only (`127.0.0.1`) | devices on `TRUSTED_SUBNET`, via TLS |
+| Required config | `OPENCLAW_GATEWAY_PASSWORD` | + `STATIC_IP`, `TRUSTED_SUBNET`, `DUCKDNS_DOMAIN`, `DUCKDNS_TOKEN` |
+
+Set `MODE` in `.env`. All `make` commands work identically in both modes; switching is `MODE=lan` + `make restart`. The networking and device-pairing sections below apply to lan mode.
+
 ## Architecture
+
+Diagram shows `MODE=lan`; in `MODE=local` the Caddy box and 80/443 exposure don't exist — clients on this machine connect straight to `127.0.0.1:18789`.
 
 ```
                     LAN Clients (10.20.30.0/24)
@@ -54,11 +69,12 @@ All settings in `.env`:
 
 | Variable | Purpose |
 |----------|---------|
+| `MODE` | `local` (default, loopback only) or `lan` (Caddy TLS on `STATIC_IP`) |
 | `LOCAL_MODEL` | Set to `llama-cpp` to enable local inference via Docker Model Runner |
 | `LOCAL_MODEL_ID` | Model to pull and run (Docker Hub or HuggingFace reference) |
 | `LOCAL_MODEL_PORT` | Port Docker Model Runner serves on (default 12434) |
-| `STATIC_IP` | Host LAN IP for Caddy to bind 80/443 |
-| `TRUSTED_SUBNET` | LAN subnet allowed through Caddy's IP filter |
+| `STATIC_IP` | Host IP for Caddy to bind 80/443 (lan mode only) |
+| `TRUSTED_SUBNET` | Subnet allowed through Caddy's IP filter (lan mode only) |
 | `DOCKER_SUBNET` | Docker bridge subnet (for Caddy's IP filter on macOS) |
 | `GATEWAY_PORT` | OpenClaw gateway loopback port |
 | `OPENCLAW_GATEWAY_PASSWORD` | Gateway auth password (replace `REPLACE_ME`) |
@@ -74,10 +90,10 @@ Local inference runs through **Docker Model Runner** with the **llama.cpp** engi
 ```bash
 # .env
 LOCAL_MODEL=llama-cpp
-LOCAL_MODEL_ID=hf.co/bartowski/google_gemma-3-1b-it-GGUF
+LOCAL_MODEL_ID=huggingface.co/bartowski/google_gemma-3-1b-it-gguf:latest
 ```
 
-When `LOCAL_MODEL` is set, the Makefile appends `--profile local-model` to all compose commands. Compose pulls the model on first `up` and starts the server automatically. `make init` includes a `model-pull` step to pre-cache it.
+When `LOCAL_MODEL` is set, the Makefile appends `--profile local-model` to all compose commands. Compose pulls the model on first `up` and starts the server automatically; subsequent starts reuse the cached model. `make init` includes a `model-pull` step to pre-cache it.
 
 ### Disable
 
@@ -149,9 +165,10 @@ make nodes-approve REQ=<request-id>    # approve it
 | File | When applied |
 |------|-------------|
 | `src/openclaw/patches/*.json5` | On gateway startup (auto-applied idempotently) |
-| `src/caddy/Caddyfile` | On restart |
+| `src/caddy/Caddyfile` | On restart (lan mode) |
 | `.env` | On restart |
-| `docker-compose.yml` | On restart |
+| `compose.yaml` | On restart |
+| `compose.lan.yaml` | On restart (lan mode) |
 
 Patches are applied by the gateway's startup command — no separate `make config` step needed. They're idempotent; the gateway re-applies them on every start.
 
@@ -159,15 +176,19 @@ Patches are applied by the gateway's startup command — no separate `make confi
 
 ```
 src/openclaw/patches/
-├── agents.json5         # agent defaults
-├── gateway.json5        # gateway auth, trusted proxies, control UI
-├── models.deepseek.json5 # DeepSeek cloud provider
-└── models.local.json5   # local model provider (Docker Model Runner)
+├── agents.json5            # agent defaults
+├── models.deepseek.json5   # DeepSeek cloud provider
+├── models.local.json5      # local model provider (Docker Model Runner)
+└── network/
+    ├── local.json5         # bind: 0.0.0.0 (local loopback access)
+    └── lan.json5           # bind: loopback (Caddy shared namespace)
 ```
 
 To add a new patch, drop a `.json5` file in the patches directory and restart.
 
-## Networking
+## Networking (lan mode)
+
+In `MODE=local` there is nothing to configure: the gateway listens on `127.0.0.1:18789` and nothing else is exposed. Everything below applies to `MODE=lan`.
 
 Everything binds to `127.0.0.1` (loopback). The only external-facing ports are Caddy's 80/443 on the host's static IP.
 
@@ -195,13 +216,13 @@ All three layers must be compromised simultaneously for an untrusted client to r
 
 **Recommended:** use a dedicated subnet that contains only devices you own and trust — for example a separate VLAN, a management network, or a VPN tunnel address pool. This means Layer 1 is enforced in hardware by your router before traffic ever reaches the host.
 
-**Acceptable but weaker:** your general LAN subnet (e.g. `192.168.1.0/24`). Layer 3 still blocks untrusted IPs, but any device on your LAN (including guest devices or IoT hardware, if they share the subnet) can at minimum reach the Caddy socket.
+**Acceptable but weaker:** your general local subnet (e.g. `192.168.1.0/24`). Layer 3 still blocks untrusted IPs, but any device on your network (including guest devices or IoT hardware, if they share the subnet) can at minimum reach the Caddy socket.
 
 Most managed switches and all-in-one routers support VLANs for this purpose. Configure your router to block inter-VLAN routing between the trusted network and any others, then point `STATIC_IP` and `TRUSTED_SUBNET` at that VLAN.
 
 ### DuckDNS and local traffic
 
-DuckDNS resolves `DUCKDNS_DOMAIN` to `STATIC_IP` — a private LAN address. Connections from trusted devices therefore stay entirely within your local network; no traffic reaches the public internet. This also means TLS certificates are obtained via DNS-01 challenge (not HTTP-01), so port 80/443 never need to be exposed to the internet.
+DuckDNS resolves `DUCKDNS_DOMAIN` to `STATIC_IP` — a private address. Connections from trusted devices therefore stay entirely within your local network; no traffic reaches the public internet. This also means TLS certificates are obtained via DNS-01 challenge (not HTTP-01), so port 80/443 never need to be exposed to the internet.
 
 ### Additional hardening on Linux
 
@@ -219,6 +240,20 @@ Persist these rules using your distro's preferred method (`iptables-persistent`,
 
 The model server runs on the host (required for Metal GPU on macOS). The gateway reaches it at `host.docker.internal:12434`. The compose `models:` element manages the server lifecycle alongside other services.
 
+## Troubleshooting
+
+**`ERROR: STATIC_IP=... is not assigned to any interface`** (lan mode) — `make run` checks that the IP exists on the host before starting. Your machine's LAN IP has changed (DHCP), you're on a different network, or `.env` has a typo. Update `STATIC_IP` (and give the host a static lease in your router so it stops moving), or set `MODE=local`.
+
+**Ports 80/443 already in use** — Another service (nginx, Apache, AirPlay Receiver on macOS) is bound to the port. Find it with `sudo lsof -iTCP:443 -sTCP:LISTEN` and stop it, or move this host to a dedicated IP.
+
+**Gateway never becomes healthy** — `docker compose up --wait` (run by `make run`) fails after 120s. Run `make logs` and look at `openclaw-gateway` output; the usual causes are a bad patch file in `src/openclaw/patches/` or corrupted state under `state/`. `make doctor ARGS="--fix"` repairs common config issues.
+
+**TLS certificate errors / `curl` says self-signed** — Caddy obtains certificates via DuckDNS DNS-01. Check `make logs` for `caddy` errors: an invalid `DUCKDNS_TOKEN`, a domain that doesn't match `DUCKDNS_DOMAIN`, or (rarely) a Let's Encrypt rate limit. The DuckDNS record must also point at `STATIC_IP` for clients to reach the right host.
+
+**Model pull fails** — `docker model pull` needs Docker Model Runner enabled (Docker Desktop → Settings → AI) and network access to Docker Hub / Hugging Face. Verify the reference with `docker model search <query>`; gated HF models require `docker login` against the HF registry.
+
+**Model runs but responses are slow or OOM** — The model may not fit in memory/VRAM. Try a smaller quantization or lower `context_size` in `docker-compose.yml`.
+
 ## Adding a new `.mk` module
 
 Drop a `.mk` file in `.make/` — it's automatically included via `$(wildcard .make/*.mk)`. No changes to the Makefile needed.
@@ -226,13 +261,12 @@ Drop a `.mk` file in `.make/` — it's automatically included via `$(wildcard .m
 ## How `make init` works
 
 ```
-verify_env → model-pull → down → build → run → wait-healthy → doctor-lint
+verify_env → model-pull → down → build → run → doctor-lint
 ```
 
-1. **verify_env** — ensures `.env` exists (copies from `.env.example` if missing)
+1. **verify_env** — ensures `.env` exists and required values are filled in (password set; DuckDNS vars in lan mode)
 2. **model-pull** — pulls the local model if `LOCAL_MODEL` is set
 3. **down** — stops any running containers
-4. **build** — builds Docker images (Caddy + OpenClaw gateway)
-5. **run** — starts all services (compose handles model lifecycle if profile active)
-6. **wait-healthy** — waits for the gateway health check to pass
-7. **doctor-lint** — runs read-only health checks (warnings are non-fatal)
+4. **build** — builds Docker images (OpenClaw gateway; + Caddy in lan mode)
+5. **run** — verifies `STATIC_IP` (lan mode), then `docker compose up -d --wait` — compose starts everything and blocks until health checks pass (120s timeout)
+6. **doctor-lint** — runs read-only health checks (warnings are non-fatal)

@@ -1,6 +1,15 @@
 -include .env
 
-DOCKER_COMPOSE := docker compose -f docker-compose.yml
+# `local` (default) — loopback only. Gateway on 127.0.0.1.
+# `lan`            — local + Caddy reverse proxy with DuckDNS TLS + IP filter.
+# Set it in .env.
+MODE ?= local
+
+DOCKER_COMPOSE := docker compose -f compose.yaml
+
+ifeq ($(MODE),lan)
+  DOCKER_COMPOSE := $(DOCKER_COMPOSE) -f compose.lan.yaml
+endif
 
 ifneq (,$(LOCAL_MODEL))
   DOCKER_COMPOSE := $(DOCKER_COMPOSE) --profile local-model
@@ -16,7 +25,7 @@ OPENCLAW := $(DOCKER_COMPOSE) exec -T openclaw-gateway node dist/index.js
 
 # init — First-time setup. Idempotent, safe to re-run.
 .PHONY: init
-init: verify_env model-pull down build run wait-healthy doctor-lint
+init: verify_env model-pull down build run doctor-lint
 	@echo ""
 	@echo "Init complete — system is running."
 
@@ -39,11 +48,11 @@ status:
 
 # rebuild — Rebuild images from scratch and redeploy.
 .PHONY: rebuild
-rebuild: down build-nocache run wait-healthy doctor-lint
+rebuild: down build-nocache run doctor-lint
 
 # restart — Stop and restart services. Data is preserved.
 .PHONY: restart
-restart: down run wait-healthy
+restart: down run
 	@echo ""
 	@echo "Restart complete — system is running."
 
@@ -52,7 +61,7 @@ restart: down run wait-healthy
 .PHONY: reset
 reset: clean init
 
-# run — Start all services.
+# run — Start all services and wait for them to be healthy.
 .PHONY: run
-run:
-	$(DOCKER_COMPOSE) up -d
+run: verify_ip
+	$(DOCKER_COMPOSE) up -d --wait --wait-timeout 120
